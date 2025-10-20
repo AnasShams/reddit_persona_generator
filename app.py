@@ -29,15 +29,11 @@ def index():
 def generate_persona():
     """Generate persona from Reddit profile URL"""
     try:
-        # Get JSON data from frontend
         data = request.get_json()
-        logger.info(f"Received data: {data}")
-        
         if not data or 'url' not in data:
             return jsonify({'error': 'No URL provided'}), 400
         
         profile_url = data['url'].strip()
-        logger.info(f"Processing URL: {profile_url}")
         
         # Validate URL format
         if not profile_url.startswith("https://www.reddit.com/user/"):
@@ -45,7 +41,8 @@ def generate_persona():
         
         # Extract username from URL
         username = profile_url.split("/user/")[1].rstrip("/")
-        logger.info(f"Extracted username: {username}")
+        
+        logger.info(f"Generating persona for user: {username}")
         
         # Initialize scraper and generator
         scraper = RedditScraper()
@@ -55,33 +52,45 @@ def generate_persona():
         logger.info("Scraping Reddit data...")
         user_data = scraper.scrape_user_profile(username)
         
-        logger.info(f"Scraped data - Posts: {len(user_data.get('posts', []))}, Comments: {len(user_data.get('comments', []))}")
-        
-        if not user_data or (not user_data.get('posts') and not user_data.get('comments')):
-            return jsonify({'error': 'Failed to scrape user data. User might not exist, profile is private, or has no public posts/comments.'}), 404
+        if not user_data:
+            return jsonify({'error': 'Failed to scrape user data. User might not exist or profile is private.'}), 404
         
         # Generate persona
         logger.info("Generating user persona...")
         persona = persona_generator.generate_persona(user_data)
         
-        logger.info(f"Persona generated successfully. Length: {len(persona)} characters")
+        # Create sample_outputs directory if it doesn't exist
+        output_dir = "sample_outputs"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
         
-        # Return the persona - make sure it's properly formatted
+        # Save to file
+        output_filename = os.path.join(output_dir, f"{username}_persona.txt")
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            f.write(persona)
+        
+        # Save raw data
+        data_filename = os.path.join(output_dir, f"{username}_raw_data.json")
+        with open(data_filename, 'w', encoding='utf-8') as f:
+            json.dump(user_data, f, indent=2, ensure_ascii=False)
+        
         return jsonify({
             'success': True,
             'username': username,
             'persona': persona,
+            'download_url': f'/download/{username}',
             'stats': {
-                'posts': len(user_data.get('posts', [])),
-                'comments': len(user_data.get('comments', []))
+                'posts': len(user_data['posts']),
+                'comments': len(user_data['comments']),
+                'output_file': output_filename
             }
         })
         
     except Exception as e:
         logger.error(f"Error generating persona: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
         return jsonify({'error': f'Internal server error: {str(e)}'}), 500
+
+# FIXED: Added <username> parameter to the route
 @app.route('/download/<username>')
 def download_persona(username):
     """Download the generated persona file"""
