@@ -81,12 +81,22 @@ class RedditScraper:
             print(f"Error scraping user {username}: {str(e)}")
             return None
     
+# In reddit_scraper.py, update the _get_user_overview method:
     def _get_user_overview(self, username: str) -> Optional[List]:
         """Get user's overview data (posts and comments)"""
         url = f"{self.base_url}/user/{username}.json"
         
         try:
+            # Add delay to be respectful
+            time.sleep(1)
+            
             response = self.session.get(url, timeout=30)
+            
+            if response.status_code == 429:
+                print("Rate limited, waiting 10 seconds...")
+                time.sleep(10)
+                response = self.session.get(url, timeout=30)
+                
             response.raise_for_status()
             
             data = response.json()
@@ -102,7 +112,7 @@ class RedditScraper:
         except json.JSONDecodeError as e:
             print(f"Error parsing JSON for {username}: {str(e)}")
             return None
-    
+        
     def _get_user_info(self, username: str) -> Dict:
         """Get user's basic info"""
         url = f"{self.base_url}/user/{username}/about.json"
@@ -212,3 +222,30 @@ class RedditScraper:
             'comments': all_comments,
             'scraped_at': datetime.now().isoformat()
         }
+        
+    # Temporary debug version - add this to reddit_scraper.py
+def _get_user_overview(self, username: str) -> Optional[List]:
+    """Get user's overview data (posts and comments)"""
+    url = f"{self.base_url}/user/{username}.json"
+    
+    print(f"DEBUG: Fetching URL: {url}")
+    
+    try:
+        response = self.session.get(url, timeout=30)
+        print(f"DEBUG: Response status: {response.status_code}")
+        
+        if response.status_code != 200:
+            print(f"DEBUG: Non-200 response: {response.text}")
+            return None
+            
+        data = response.json()
+        print(f"DEBUG: Got data with {len(data.get('data', {}).get('children', []))} items")
+        
+        if 'data' in data and 'children' in data['data']:
+            return data['data']['children']
+        
+        return None
+        
+    except Exception as e:
+        print(f"DEBUG: Exception: {str(e)}")
+        return None
